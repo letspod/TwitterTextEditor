@@ -49,27 +49,10 @@ you can use Twitter Text Editor with other dependency management tools.
 
 #### CocoaPods
 
-To use Twitter Text Editor with [CocoaPods](https://cocoapods.org/), add next `TwitterTextEditor.podspec` in your project.
+Update `Podfile` in your project.
 
 ```ruby
-Pod::Spec.new do |spec|
-  spec.name = "TwitterTextEditor"
-  spec.version = "1.0.0" # Find the the version from the Git tags
-  spec.authors = ""
-  spec.summary = "TwitterTextEditor"
-  spec.homepage = "https://github.com/twitter/TwitterTextEditor"
-  spec.platform = :ios, "11.0"
-  spec.source = {
-    :git => "https://github.com/twitter/TwitterTextEditor.git", :tag => "#{spec.version}"
-  }
-  spec.source_files  = "Sources/TwitterTextEditor/*.swift"
-end
-```
-
-Then, update `Podfile` in your project.
-
-```ruby
-pod 'TwitterTextEditor', :podspec => 'path/to/TwitterTextEditor.podspec'
+pod 'TwitterTextEditor'
 ```
 
 #### Carthage
