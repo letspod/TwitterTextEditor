@@ -49,7 +49,7 @@ correct: .bundle
 
 .PHONY: lint
 lint: .bundle
-	$(SWIFTLINT)
+	$(SWIFTLINT) --strict
 	$(BUNDLE) exec rubocop
 
 $(BUILD_PROJECT): Package.swift Sources/**/* Tests/**/*
@@ -90,7 +90,7 @@ doc: $(DOCUMENTATION_OUTPUT_PATH)
 
 .PHONY: doc-server
 doc-server: .bundle doc
-	@$(BUNDLE) exec $(RUBY) Scripts/docserver.rb \
+	@$(BUNDLE) exec $(RUBY) scripts/docserver.rb \
 		-d "$(DOCUMENTATION_OUTPUT_PATH)" \
 		-c "make doc" \
 		$(DOCUMENTATION_SUPPLIMENT_FILES) \

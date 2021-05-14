@@ -12,21 +12,18 @@ import MobileCoreServices
 import UIKit
 
 /**
- A delegate that extends `UITextViewDelegate` for `TextView`.
+ A delegate for handling text input behaviors.
  */
-@objc
-protocol TextViewDelegate: UITextViewDelegate {
+protocol TextViewTextInputDelegate: AnyObject {
     /**
-     Delegate callback when the text view unmarks the marked text.
+     Delegate callback to ask if text view should accept return text input or not.
 
      - Parameters:
-       - textView: A `TextView` that unmarked the marked text.
+       - textView: A `TextView` that changed the base writing direction.
 
-     - SeeAlso:
-       - `UITextInput.hasMarkedText`
+     - Returns: `true` if the text view can accept return text input.
      */
-    @objc
-    optional func textViewDidUnmarkText(_ textView: TextView)
+    func textViewShouldReturn(_ textView: TextView) -> Bool
 
     /**
      Delegate callback when the text view changed base writing direction.
@@ -36,10 +33,9 @@ protocol TextViewDelegate: UITextViewDelegate {
        - writingDirection: The current base writing direction.
        - range: A range of text where the base writing direction changed.
      */
-    @objc
-    optional func textView(_ textView: TextView,
-                           didChangeBaseWritingDirection writingDirection: NSWritingDirection,
-                           forRange range: UITextRange)
+    func textView(_ textView: TextView,
+                  didChangeBaseWritingDirection writingDirection: NSWritingDirection,
+                  forRange range: UITextRange)
 }
 
 /**
@@ -293,6 +289,22 @@ final class TextView: UITextView {
 
     // MARK: - UITextInput
 
+    weak var textViewTextInputDelegate: TextViewTextInputDelegate?
+
+    // Only `U+000A` ("\n") is a valid text that return text input insert.
+    private let returnTextInputInsertText = "\n"
+
+    override func insertText(_ text: String) {
+        if text == returnTextInputInsertText,
+           let textViewTextInputDelegate = textViewTextInputDelegate,
+           !textViewTextInputDelegate.textViewShouldReturn(self)
+        {
+            return
+        }
+
+        super.insertText(text)
+    }
+
     override func deleteBackward() {
         /*
          UIKit bug workaround
@@ -315,20 +327,10 @@ final class TextView: UITextView {
         super.deleteBackward()
     }
 
-    override func unmarkText() {
-        super.unmarkText()
-
-        if let delegate = delegate as? TextViewDelegate {
-            delegate.textViewDidUnmarkText?(self)
-        }
-    }
-
     override func setBaseWritingDirection(_ writingDirection: NSWritingDirection, for range: UITextRange) {
         super.setBaseWritingDirection(writingDirection, for: range)
 
-        if let delegate = delegate as? TextViewDelegate {
-            delegate.textView?(self, didChangeBaseWritingDirection: writingDirection, forRange: range)
-        }
+        textViewTextInputDelegate?.textView(self, didChangeBaseWritingDirection: writingDirection, forRange: range)
     }
 
     // MARK: - UIPasteConfigurationSupporting
@@ -387,4 +389,28 @@ final class TextView: UITextView {
         }
     }
 #endif
+
+    // MARK: - UIScrollView
+
+    private let delegateForwarder = TextViewDelegateForwarder()
+
+    var textViewDelegate: UITextViewDelegate? {
+        get {
+            super.delegate
+        }
+        set {
+            delegateForwarder.textViewDelegate = newValue
+            super.delegate = delegateForwarder
+        }
+    }
+
+    override var delegate: UITextViewDelegate? {
+        get {
+            super.delegate
+        }
+        set {
+            delegateForwarder.scrollViewDelegate = newValue
+            super.delegate = delegateForwarder
+        }
+    }
 }

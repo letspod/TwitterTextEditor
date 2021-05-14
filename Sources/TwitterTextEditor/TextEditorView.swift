@@ -22,7 +22,7 @@ public protocol TextEditorViewEditingDelegate: AnyObject {
      - Parameters:
        - textEditorView: A delegating `TextEditorView`.
 
-     - Returns: `YES` to begin editing, `NO` to not.
+     - Returns: `true` to begin editing, `false` to not.
      */
     func textEditorViewShouldBeginEditing(_ textEditorView: TextEditorView) -> Bool
     /**
@@ -337,7 +337,8 @@ extension EditingContent: TextEditorViewEditingContent {
  */
 public final class TextEditorView: UIView {
     private let textStorage: NSTextStorage
-    private let textView: TextView
+
+    let textView: TextView
 
     private var userInteractionDidChangeTextViewScheduler: DebounceScheduler!
     private var updatePlaceholderTextScheduler: DebounceScheduler!
@@ -375,7 +376,9 @@ public final class TextEditorView: UIView {
 
         textStorage.delegate = self
 
-        textView.delegate = self
+        textView.textViewDelegate = self
+        textView.textViewTextInputDelegate = self
+
         textView.pasteDelegate = self
 
         textView.textDragDelegate = self
@@ -864,6 +867,19 @@ public final class TextEditorView: UIView {
         }
     }
 
+    /**
+     Enable to return text input to end editing.
+
+     Useful for similar feature using `UITextField` for single line text editing with
+     `TextEditorViewEditingContentDelegate` to replace or filter new line characters.
+
+     - SeeAlso:
+       - `isEditing`
+       - `returnKeyType`
+       - `TextEditorViewEditingContentDelegate`
+     */
+    public var returnToEndEditingEnabled: Bool = false
+
     // MARK: - Properties (Text Input)
 
     /**
@@ -904,30 +920,6 @@ public final class TextEditorView: UIView {
      */
     public var textContentView: UIView {
         textView.textInputView
-    }
-
-    private var _inputAccessoryView: UIView?
-
-    /// :nodoc:
-    public override var inputAccessoryView: UIView? {
-        get {
-            _inputAccessoryView
-        }
-        set {
-            _inputAccessoryView = newValue
-        }
-    }
-
-    private var _inputAccessoryViewController: UIInputViewController?
-
-    /// :nodoc:
-    public override var inputAccessoryViewController: UIInputViewController? {
-        get {
-            _inputAccessoryViewController
-        }
-        set {
-            _inputAccessoryViewController = newValue
-        }
     }
 
     /**
@@ -1419,48 +1411,6 @@ public final class TextEditorView: UIView {
         }
     }
 
-    /**
-     The current keyboard type.
-
-     - SeeAlso:
-       - `UIKeyboardType`
-     */
-    public var keyboardType: UIKeyboardType {
-        get {
-            textView.keyboardType
-        }
-        set {
-            textView.keyboardType = newValue
-        }
-    }
-
-    /**
-     The current keyboard appearance.
-
-     - SeeAlso:
-       - `UIKeyboardAppearance`
-     */
-    public var keyboardAppearance: UIKeyboardAppearance {
-        get {
-            textView.keyboardAppearance
-        }
-        set {
-            textView.keyboardAppearance = newValue
-        }
-    }
-
-    /**
-     The current spell checking type.
-     */
-    public var spellCheckingType: UITextSpellCheckingType {
-        get {
-            textView.spellCheckingType
-        }
-        set {
-            textView.spellCheckingType = newValue
-        }
-    }
-
     // MARK: - Notifications
 
     @objc
@@ -1505,6 +1455,97 @@ public final class TextEditorView: UIView {
         }
 
         textView.panGestureRecognizer.isEnabled = isScrollEnabled
+    }
+
+    // MARK: - UIResponder
+
+    /// :nodoc:
+    public override var canBecomeFirstResponder: Bool {
+        textView.canBecomeFirstResponder
+    }
+
+    /// :nodoc:
+    public override func becomeFirstResponder() -> Bool {
+        textView.becomeFirstResponder()
+    }
+
+    /// :nodoc:
+    public override var canResignFirstResponder: Bool {
+        textView.canResignFirstResponder
+    }
+
+    /// :nodoc:
+    public override func resignFirstResponder() -> Bool {
+        textView.resignFirstResponder()
+    }
+
+    /// :nodoc:
+    public override var isFirstResponder: Bool {
+        textView.isFirstResponder
+    }
+
+    // MARK: - UIResponder (UIResponderInputViewAdditions)
+
+    private var _inputAccessoryView: UIView?
+
+    /// :nodoc:
+    public override var inputAccessoryView: UIView? {
+        get {
+            guard let inputAccessoryView = _inputAccessoryView else {
+                return super.inputAccessoryView
+            }
+            return inputAccessoryView
+        }
+        set {
+            _inputAccessoryView = newValue
+        }
+    }
+
+    private var _inputAccessoryViewController: UIInputViewController?
+
+    /// :nodoc:
+    public override var inputAccessoryViewController: UIInputViewController? {
+        get {
+            guard let inputAccessoryViewController = _inputAccessoryViewController else {
+                return super.inputAccessoryViewController
+            }
+            return inputAccessoryViewController
+        }
+        set {
+            _inputAccessoryViewController = newValue
+        }
+    }
+
+    /// :nodoc:
+    public override var inputView: UIView? {
+        // `UITextView` overrides `inputView` default behavior and it does *NOT* go up the responder chain,
+        // unlike `inputViewController` or `inputAccessoryView`, or `inputAccessoryViewController`.
+        get {
+            textView.inputView
+        }
+        set {
+            textView.inputView = newValue
+        }
+    }
+
+    private var _inputViewController: UIInputViewController?
+
+    /// :nodoc:
+    public override var inputViewController: UIInputViewController? {
+        get {
+            guard let inputViewController = _inputViewController else {
+                return super.inputViewController
+            }
+            return inputViewController
+        }
+        set {
+            _inputViewController = newValue
+        }
+    }
+
+    /// :nodoc:
+    public override func reloadInputViews() {
+        textView.reloadInputViews()
     }
 }
 
@@ -1592,14 +1633,14 @@ extension TextEditorView: NSTextStorageDelegate {
     }
 }
 
-// MARK: - TextViewDelegate
+// MARK: - UITextViewDelegate
 
 /// :nodoc:
 extension EditingContent.ChangeResult: TextEditorViewChangeResult {
 }
 
 /// :nodoc:
-extension TextEditorView: TextViewDelegate {
+extension TextEditorView: UITextViewDelegate {
     public func textViewShouldBeginEditing(_ textView: UITextView) -> Bool {
         editingDelegate?.textEditorViewShouldBeginEditing(self) ?? true
     }
@@ -1705,6 +1746,27 @@ extension TextEditorView: TextViewDelegate {
         log(type: .debug, "change result: %@", String(describing: changeResult))
         changeObserver?.textEditorView(self, didChangeWithChangeResult: changeResult)
     }
+}
+
+// MARK: - TextViewTextInputDelegate
+
+/// :nodoc:
+extension TextEditorView: TextViewTextInputDelegate {
+    func textViewShouldReturn(_ textView: TextView) -> Bool {
+        log(type: .debug)
+
+        guard returnToEndEditingEnabled else {
+            return true
+        }
+
+        // Return `false` from this delegate will keep `isUserInteractionBeingProcessed` to `true`.
+        // However, setting `isEditing` to `false` calls `textViewDidEndEditing(_:)` that is currently calling
+        // `userInteractionDidChangeTextViewScheduler.perform()`, which eventually sets `isUserInteractionBeingProcessed` to `false`.
+        // See `userInteractionDidChangeTextView()`.
+        isEditing = false
+
+        return false
+    }
 
     func textView(_ textView: TextView,
                   didChangeBaseWritingDirection writingDirection: NSWritingDirection,
@@ -1715,7 +1777,7 @@ extension TextEditorView: TextViewDelegate {
 
         updatePlaceholderTextScheduler.schedule()
 
-        self.textInputObserver?.textEditorView(self, didChangeBaseWritingDirection: writingDirection)
+        textInputObserver?.textEditorView(self, didChangeBaseWritingDirection: writingDirection)
     }
 }
 
@@ -1822,7 +1884,8 @@ extension TextEditorView: TextViewTextPasteDelegate {
          UIKit bug workaround
          UIKit behavior note
 
-         - Confirmed on iOS 14.1 and prior.
+         - Confirmed on iOS 14.4 and prior.
+         - Fixed on iOS 14.5.
          - See <https://feedbackassistant.apple.com/feedback/8834804>
 
          `UITextView` inserts an unexpected space when calling `UITextPasteItem.setNoResult` at the cursor
@@ -1851,11 +1914,15 @@ extension TextEditorView: TextViewTextPasteDelegate {
                 // Called on an arbitrary background or main queue.
                 switch result {
                 case .transformed:
-                    // UIKit bug workaround
-                    DispatchQueue.main.async {
-                       self.textView.withNoSmartInsertDeleteType {
-                            item.setNoResult()
-                       }
+                    if #available(iOS 14.5, *) {
+                        item.setNoResult()
+                    } else {
+                        // UIKit bug workaround
+                        DispatchQueue.main.async {
+                            self.textView.withNoSmartInsertDeleteType {
+                                item.setNoResult()
+                            }
+                        }
                     }
                 case .transformedToString(let string):
                     item.setResult(string: string)
@@ -1876,12 +1943,16 @@ extension TextEditorView: TextViewTextPasteDelegate {
                 // Called on an arbitrary background or main queue.
                 switch result {
                 case .transformed:
-                    // UIKit bug workaround
-                    DispatchQueue.main.async {
-                        self.textView.withNoSmartInsertDeleteType {
-                            itemToSetResult.setNoResult()
+                    if #available(iOS 14.5, *) {
+                        itemToSetResult.setNoResult()
+                    } else {
+                        // UIKit bug workaround
+                        DispatchQueue.main.async {
+                            self.textView.withNoSmartInsertDeleteType {
+                                itemToSetResult.setNoResult()
+                            }
+                            next(.break)
                         }
-                        next(.break)
                     }
                 case .transformedToString(let string):
                     itemToSetResult.setResult(string: string)
